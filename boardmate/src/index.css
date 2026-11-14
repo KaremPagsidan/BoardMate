@@ -1,0 +1,282 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #F9F8F3;
+  color: #2D2D2D;
+  min-width: 320px;
+  min-height: 100dvh;
+}
+
+.bm-portal-page { width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; background: #faf7ee; color: #2d2d2d; }
+.bm-portal-page-header { display: flex; align-items: center; gap: 12px; padding: 12px max(14px, env(safe-area-inset-left)); border-bottom: 1px solid #deded4; flex-shrink: 0; background: #faf7ee; }
+.bm-portal-page-header button { min-height: 44px; color: #416348; font-weight: 600; }
+.bm-portal-page-header h1 { min-width: 0; overflow-wrap: anywhere; font-size: 18px; line-height: 1.3; font-weight: 700; }
+.bm-portal-page-content { width: min(100%, 900px); margin-inline: auto; padding: 16px; overflow-y: auto; flex: 1; min-height: 0; min-width: 0; overscroll-behavior: contain; }
+.bm-message-media { position: relative; padding: 12px; background: #ffffff60; border-radius: 12px; cursor: pointer; }
+.bm-message-media video, .bm-message-media audio { cursor: default; }
+.bm-message-preview { position: absolute; right: 4px; top: 4px; width: 32px; height: 32px; border-radius: 8px; background: #faf7ee; color: #38543e; }
+.bm-profile-media-grid figure { position: relative; }
+.bm-photo-menu { position: absolute; top: 6px; right: 6px; z-index: 2; }
+.bm-photo-menu > button { min-width: 36px; min-height: 36px; border-radius: 50%; background: #faf7ee; color: #2d2d2d; font-size: 24px; }
+.bm-photo-menu-options { position: absolute; right: 0; top: 40px; min-width: 190px; background: white; box-shadow: 0 4px 20px #0003; border: 1px solid #deded4; border-radius: 10px; overflow: hidden; }
+.bm-photo-menu-options button { display: block; width: 100%; padding: 12px; text-align: left; font-size: 12px; }
+.bm-photo-menu-options button:hover { background: #eef4ea; }
+.bm-photo-privacy-label { display: inline-block; padding: 4px 8px; margin-right: 4px; border-radius: 8px; font-size: 11px; background: #faf7ee; color: #38543e; }
+.bm-profile-managed-photo { position: relative; }
+.bm-chat-image-button { display: block; width: min(240px, 55cqw); max-width: 100%; padding: 0; }
+.bm-chat-image { display: block; width: 100%; height: auto; max-height: 220px; object-fit: contain; border-radius: 12px; }
+@media (max-width: 639px) {
+  .bm-portal-page input:not([type='checkbox']):not([type='radio']), .bm-portal-page select, .bm-portal-page textarea { font-size: 16px; max-width: 100%; }
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: none;
+}
+
+.boardmate-app-shell {
+  /* Establish the viewport for fixed descendants and container queries. */
+  contain: layout paint;
+  container: boardmate / size;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.boardmate-app-shell :is(img, video, audio, object) { max-width: 100%; }
+.boardmate-app-shell :is(input, select, textarea) { min-width: 0; }
+.boardmate-quick-actions > * { min-width: 0; min-height: 76px; overflow-wrap: anywhere; }
+.boardmate-quick-actions > button > span.font-bold { font-size: 11px; line-height: 1.4; }
+@container boardmate (max-width: 639px) {
+  .boardmate-renter-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .boardmate-renter-actions > button { grid-column: auto; }
+  .boardmate-renter-actions > button:last-child { grid-column: 1 / -1; }
+}
+.boardmate-app-shell :is([role='dialog'], [role='alertdialog']) {
+  min-width: 0;
+  min-height: 0;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+}
+.boardmate-app-shell :is([role='dialog'], [role='alertdialog']) button:not(.bm-crop-handle) {
+  min-height: 44px;
+}
+.bm-media-dialog { height: 100%; min-height: 0; }
+.bm-media-stage { flex: 1; min-height: 0; width: 100%; overflow: auto; overscroll-behavior: contain; }
+.bm-media-stage > img { display: block; max-width: none; object-fit: contain; }
+.boardmate-app-shell .bm-media-stage > img { max-width: none; }
+.bm-media-stage > :is(video, object) { display: block; width: 100%; height: 100%; object-fit: contain; }
+.bm-media-stage > audio { display: block; width: 100%; margin-block: 24px; }
+.bm-media-zoom { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; flex-shrink: 0; font-size: 12px; }
+.bm-media-zoom input { flex: 1; min-width: 60px; }
+.bm-media-zoom button { padding-inline: 8px; }
+
+/* These responsive utilities measure the portal, not the browser around it. */
+@container boardmate (min-width: 640px) {
+  .frame-sm\:p-6 { padding: 1.5rem; }
+  .frame-sm\:px-7 { padding-inline: 1.75rem; }
+  .frame-sm\:text-2xl { font-size: 1.5rem; line-height: 2rem; }
+  .frame-sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .frame-sm\:h-64 { height: 16rem; }
+  .frame-sm\:flex-row { flex-direction: row; }
+  .frame-sm\:justify-end { justify-content: flex-end; }
+}
+
+/* Phone layouts use the available width, including wider Android handsets. */
+@container boardmate (max-width: 639px) {
+  .boardmate-user-dashboard {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .boardmate-user-dashboard input:not([type='checkbox']):not([type='radio']),
+  .boardmate-user-dashboard select,
+  .boardmate-user-dashboard textarea {
+    font-size: 16px;
+    max-width: 100%;
+  }
+
+  .boardmate-mobile-nav > button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .boardmate-dashboard-shortcuts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 639px) {
+  .boardmate-app-shell {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@container boardmate (max-width: 359px) {
+  .boardmate-dashboard-shortcuts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.boardmate-login-form {
+  max-width: 480px;
+  margin-inline: auto;
+}
+
+@media (min-width: 640px) {
+  .boardmate-app-shell {
+    width: min(calc(100vw - 2rem), 390px);
+    height: min(812px, calc(100dvh - 2rem));
+    border: 4px solid #374151;
+    border-radius: 36px;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 35%);
+  }
+}
+
+@media (min-width: 640px) and (max-height: 640px) {
+  .boardmate-app-shell {
+    height: calc(100dvh - 2rem);
+  }
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
+button {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 180ms;
+}
+
+button:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.nav-icon-active {
+  animation: nav-icon-select 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes nav-icon-select {
+  0% { transform: scale(0.88); }
+  65% { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+.splash-card {
+  animation: splash-card-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 450ms ease;
+}
+
+.splash-logo {
+  animation: splash-logo-float 2.8s ease-in-out 700ms infinite;
+  transform-origin: center;
+}
+
+.welcome-brand-card {
+  animation: welcome-brand-shape 6s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.welcome-brand-icon {
+  animation: welcome-brand-mark 4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.splash-starting .splash-card {
+  animation: none;
+  transform: scale(0.88);
+  box-shadow: 0 0 0 12px rgb(250 246 238 / 18%), 0 18px 35px rgb(31 41 35 / 20%);
+}
+
+.splash-starting .splash-logo {
+  animation: splash-logo-pop 450ms ease-in both;
+}
+
+@keyframes splash-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes splash-logo-float {
+  0%, 100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-5px) rotate(-3deg);
+  }
+}
+
+@keyframes splash-logo-pop {
+  50% {
+    transform: scale(1.18) rotate(-8deg);
+  }
+  100% {
+    transform: scale(0.9) rotate(0);
+  }
+}
+
+@keyframes welcome-brand-shape {
+  0%, 100% { border-radius: 1.5rem; transform: translateY(0); }
+  50% { border-radius: 2rem 1.25rem 2rem 1.25rem; transform: translateY(-4px); }
+}
+
+@keyframes welcome-brand-mark {
+  0%, 100% { transform: scale(1) rotate(0); }
+  50% { transform: scale(1.06) rotate(-4deg); }
+}
+
+.roommate-heart-pop {
+  display: inline-block;
+  animation: roommate-heart-pop 320ms ease-out;
+}
+
+@keyframes roommate-heart-pop {
+  0% {
+    transform: scale(0.55);
+  }
+  65% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-card,
+  .splash-logo,
+  .welcome-brand-card,
+  .welcome-brand-icon,
+  .roommate-heart-pop {
+    animation: none;
+    transition: none;
+  }
+
+  .nav-icon-active {
+    animation: none;
+  }
+
+  button {
+    transition-duration: 0ms !important;
+  }
+
+  button:not(:disabled):active {
+    transform: none;
+  }
+}

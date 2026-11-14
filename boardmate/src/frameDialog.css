@@ -1,0 +1,19 @@
+dialog.bm-frame-dialog {
+  position: fixed;
+  inset: auto;
+  left: calc(var(--frame-left) + var(--frame-width) / 2);
+  top: calc(var(--frame-top) + var(--frame-height) / 2);
+  transform: translate(-50%, -50%);
+  margin: 0;
+  width: min(860px, calc(var(--frame-width) - 24px));
+  max-width: calc(var(--frame-width) - 24px);
+  max-height: calc(var(--frame-height) - 24px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+dialog.bm-frame-dialog::backdrop {
+  clip-path: inset(var(--frame-top) calc(100% - var(--frame-left) - var(--frame-width)) calc(100% - var(--frame-top) - var(--frame-height)) var(--frame-left));
+}
+dialog.bm-app-dialog.bm-frame-dialog { width: min(420px, calc(var(--frame-width) - 24px)); }
+.bm-frame-dialog .verification-file-canvas { height: calc(var(--frame-height) * .65); max-height: calc(var(--frame-height) * .65); }
+.bm-frame-dialog .verification-file-pdf { height: calc(var(--frame-height) * .65); }

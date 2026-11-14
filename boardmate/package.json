@@ -1,0 +1,38 @@
+{
+  "name": "boardmate",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:admin": "vite --open /admin.html",
+    "build": "vite build",
+    "build:admin": "vite build --config vite.admin.config.js",
+    "lint": "eslint .",
+    "test:responsive": "node tests/responsive.browser.mjs",
+    "test:verification": "node --test tests/verification.test.mjs tests/verification.database.test.mjs tests/directMessages.test.mjs",
+    "test:verification:local": "node --test tests/verification.supabase.test.mjs",
+    "test:listings": "node --test tests/listingDetails.test.mjs tests/listingWindow.test.mjs",
+    "test:profiles": "node --test tests/profileLayout.test.mjs",
+    "test:suspension": "node --test tests/suspensionVisibility.test.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "supabase": "^3.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16",
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "eslint": "^10.9.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.4",
+    "globals": "^17.11.0",
+    "vite": "^8.2.2"
+  }
+}

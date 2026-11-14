@@ -1,0 +1,19 @@
+.bm-post-details { min-width: 0; width: 100%; color: #2d4736; overflow-wrap: anywhere; }
+.bm-post-details h2 { margin: 0 0 16px; font-size: 22px; line-height: 1.35; font-weight: 700; }
+.bm-post-details h3 { margin: 0 0 10px; font-size: 16px; font-weight: 700; }
+.bm-post-details section { margin-block: 20px; }
+.bm-post-byline { margin-bottom: 12px; font-size: 13px; color: #66775f; }
+.bm-post-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-block: 20px; }
+.bm-post-facts > div { min-width: 0; }
+.bm-post-facts dt { font-size: 12px; color: #66775f; margin-bottom: 4px; }
+.bm-post-facts dd { margin: 0; font-size: 14px; line-height: 1.5; }
+.bm-post-description { white-space: pre-wrap; font-size: 14px; line-height: 1.7; }
+.bm-post-media { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.bm-post-media figure { min-width: 0; margin: 0; padding: 12px; border: 1px solid #dfe7d9; border-radius: 12px; background: #fff; }
+.bm-post-media figure > button { display: block; max-width: 100%; }
+.bm-post-media figcaption { margin-block: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.bm-post-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; padding-block: 16px; border-top: 1px solid #dfe7d9; }
+.bm-post-actions button { min-height: 44px; max-width: 100%; padding: 10px 14px; border: 1px solid #82ab85; border-radius: 10px; color: #315d3e; background: #edf4e8; font-size: 14px; overflow-wrap: anywhere; }
+.bm-post-actions button:disabled { opacity: .5; }
+@container boardmate (max-width: 359px) { .bm-post-facts { grid-template-columns: minmax(0, 1fr); } }
+@container boardmate (min-width: 700px) { .bm-post-media { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

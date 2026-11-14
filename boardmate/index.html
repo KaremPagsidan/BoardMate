@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <title>BoardMate</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                bg: '#F8F6F0',
+                green: '#82AB85',
+                darkGreen: '#6B946E',
+                cardBg: '#EFECE1',
+                textDark: '#2B2B2B',
+                lightGreen: '#DCE6DD'
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+      /* Hide scrollbar for clean UI but keep scroll functionality */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  </head>
+  <body class="m-0 min-h-dvh w-full bg-[#1E293B]">
+    <div id="root" class="min-h-dvh w-full"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+.verification-file-preview { margin-top: 12px; padding: 12px; border: 1px solid #d6e2d1; border-radius: 12px; background: #f7faf3; color: #294633; min-width: 0; }
+.verification-file-title { margin: 0 0 8px; font-size: 12px; font-weight: 700; }
+.verification-file-thumbnail { display: block; width: 100%; height: 180px; overflow: hidden; padding: 0; border: 0; border-radius: 8px; background: #e9efe3; cursor: zoom-in; }
+.verification-file-thumbnail img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.verification-file-name, .verification-file-note { margin: 8px 0; font-size: 11px; overflow-wrap: anywhere; }
+.verification-file-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.verification-file-actions button, .verification-file-dialog header button { padding: 7px 10px; border: 1px solid #b8cdb2; border-radius: 7px; background: #fff; color: #315c3c; font-size: 12px; font-weight: 650; cursor: pointer; }
+.verification-file-actions button:disabled { opacity: .5; cursor: wait; }
+.verification-file-dialog { width: min(94vw, 860px); max-width: 94vw; max-height: 90dvh; padding: 16px; border: 0; border-radius: 16px; background: #f7faf3; color: #294633; box-sizing: border-box; }
+.verification-file-dialog::backdrop { background: #102719cc; }
+.verification-file-dialog header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; font-size: 14px; }
+.verification-file-zoom { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 12px; font-size: 12px; }
+.verification-file-zoom input { accent-color: #507e54; }
+.verification-file-canvas { height: 65dvh; max-height: 65dvh; overflow: auto; border-radius: 8px; background: #e5ebdf; }
+.verification-file-canvas img { display: block; max-width: none; height: 100%; object-fit: contain; margin: 0 auto; }
+.verification-file-pdf { display: block; width: 100%; height: 65dvh; border: 0; }
+.verification-file-preview button:focus-visible, .verification-file-dialog :is(button, input, a):focus-visible { outline: 3px solid #6c956c; outline-offset: 3px; }

@@ -1,0 +1,17 @@
+/* Native media has intrinsic minimum widths. Bound the player, not just its image. */
+.bm-uploaded-media { display: block; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+video.bm-uploaded-media { height: auto; object-fit: contain; }
+audio.bm-uploaded-media { height: 44px; }
+.bm-message-media { width: 100%; max-width: 100%; min-width: 0; }
+.bm-message-media :is(video, audio) { width: 100%; min-width: 0; max-width: 100%; }
+.bm-message-bubble { min-width: 0; overflow-wrap: anywhere; }
+.bm-message-attachment { width: min(78%, 280px); }
+.bm-media-stage > video.bm-uploaded-media { height: 100%; max-height: 100%; }
+.bm-media-stage > audio.bm-uploaded-media { height: 44px; }
+.bm-post-media-image { display: block; width: 100%; height: auto; max-height: 280px; object-fit: contain; }
+@container boardmate (max-width: 639px) {
+  .boardmate-app-shell video.bm-uploaded-media { max-height: min(240px, 40cqh); }
+  .boardmate-app-shell .bm-media-stage > video.bm-uploaded-media { max-height: 100%; }
+  .bm-profile-post-media { grid-template-columns: minmax(0, 1fr); }
+  .bm-profile-post-media > *, .bm-profile-audio { min-width: 0; max-width: 100%; }
+}
