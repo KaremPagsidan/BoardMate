@@ -86,6 +86,7 @@ export default function App() {
   const [legalDialog, setLegalDialog] = useState(null);
   const [optionalCookies, setOptionalCookies] = useState(false);
   const [cookieSettingsError, setCookieSettingsError] = useState('');
+  const registrationBodyRef = useRef(null);
 
   // Upload Files State (For ID & Selfie)
   const [idFile, setIdFile] = useState(null);
@@ -165,6 +166,49 @@ export default function App() {
       connection?.removeEventListener('change', updateConnectionIssue);
     };
   }, []);
+
+  useEffect(() => {
+    if (currentScreen !== 'REGISTRATION') return undefined;
+    const body = registrationBodyRef.current;
+    if (!body) return undefined;
+
+    let scrollFrame;
+    const keepFocusedFieldVisible = () => {
+      const focused = document.activeElement;
+      if (!(focused instanceof HTMLElement)
+        || !body.contains(focused)
+        || !focused.matches('input:not([type="file"]):not([type="hidden"]), select, textarea')) return;
+      cancelAnimationFrame(scrollFrame);
+      scrollFrame = requestAnimationFrame(() => {
+        if (focused !== document.activeElement || !body.contains(focused)) return;
+        const bodyBounds = body.getBoundingClientRect();
+        const fieldBounds = focused.getBoundingClientRect();
+        const inset = Math.min(20, bodyBounds.height / 4);
+        if (fieldBounds.top >= bodyBounds.top + inset && fieldBounds.bottom <= bodyBounds.bottom - inset) return;
+        focused.scrollIntoView({
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          block: 'center',
+          inline: 'nearest',
+        });
+      });
+    };
+    const viewport = window.visualViewport;
+    body.addEventListener('focusin', keepFocusedFieldVisible);
+    viewport?.addEventListener('resize', keepFocusedFieldVisible);
+    viewport?.addEventListener('scroll', keepFocusedFieldVisible);
+    return () => {
+      body.removeEventListener('focusin', keepFocusedFieldVisible);
+      viewport?.removeEventListener('resize', keepFocusedFieldVisible);
+      viewport?.removeEventListener('scroll', keepFocusedFieldVisible);
+      cancelAnimationFrame(scrollFrame);
+    };
+  }, [currentScreen]);
+
+  useEffect(() => {
+    if (currentScreen === 'REGISTRATION' && registrationBodyRef.current) {
+      registrationBodyRef.current.scrollTop = 0;
+    }
+  }, [currentScreen, regStep]);
 
   const retryConnection = () => {
     const issue = getConnectionIssue();
@@ -672,6 +716,18 @@ export default function App() {
   return (
     <AppViewport>
 
+      {(currentScreen === 'OWNER_DASHBOARD' || currentScreen === 'RENTER_DASHBOARD') && (
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          aria-label="Refresh dashboard"
+          title="Refresh dashboard"
+          className="boardmate-desktop-refresh-button absolute right-3 top-3 z-[60] h-9 w-9 place-items-center rounded-full bg-white text-emerald-800 shadow-md transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700"
+        >
+          <i className="fa-solid fa-rotate" aria-hidden="true"></i>
+        </button>
+      )}
+
       {connectionIssue && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4" role="alertdialog" aria-modal="true" aria-labelledby="connection-alert-title" aria-describedby="connection-alert-message">
           <section className="w-full max-w-sm rounded-2xl bg-[#FAF7EE] p-6 text-center shadow-2xl">
@@ -701,18 +757,6 @@ export default function App() {
           Restoring your session…
         </div>
       )}
-      {(currentScreen === 'OWNER_DASHBOARD' || currentScreen === 'RENTER_DASHBOARD') && (
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          aria-label="Refresh dashboard"
-          title="Refresh dashboard"
-          className="absolute right-3 top-3 z-[60] grid h-9 w-9 place-items-center rounded-full bg-white text-emerald-800 shadow-md transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700"
-        >
-          <i className="fa-solid fa-rotate" aria-hidden="true"></i>
-        </button>
-      )}
-      
       {/* ------------ SCREEN 1: SPLASH SCREEN ------------ */}
       {currentScreen === 'MAIN' && (
         <WelcomeScreen onStart={() => setCurrentScreen('WELCOME')} />
@@ -972,10 +1016,10 @@ export default function App() {
 
       {/* ---------------- SCREEN 6: REGISTRATION FLOW ---------------- */}
       {currentScreen === 'REGISTRATION' && (
-        <div className="w-full h-full flex flex-col justify-between bg-[#F8F6F0]">
+        <div className="boardmate-registration flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#F8F6F0]">
           
           {/* Header */}
-          <div className="p-4 pt-6 bg-[#F8F6F0] border-b border-gray-200/60 text-center flex flex-col items-center">
+          <div className="boardmate-registration-header shrink-0 px-4 py-3 bg-[#F8F6F0] border-b border-gray-200/60 text-center flex flex-col items-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <BoardMateHouseIcon className="w-5 h-5 text-[#82AB85]" />
               <span className="font-serif font-bold text-sm">Board<span className="text-[#82AB85]">Mate</span></span>
@@ -1002,32 +1046,32 @@ export default function App() {
             </p>
 
             {/* Stepper Header */}
-            <div className="flex items-center justify-center gap-6 mt-4 w-full max-w-[260px]">
-              <div className="flex flex-col items-center">
+            <div className="boardmate-registration-stepper flex items-start justify-center gap-2 mt-3 w-full max-w-[280px]">
+              <div className="flex min-w-0 flex-col items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${regStep >= 1 ? 'bg-[#82AB85] text-white' : 'bg-gray-300 text-gray-600'}`}>
                   1
                 </div>
-                <span className="text-[10px] font-semibold mt-1">Account Info</span>
+                <span className="mt-1 whitespace-nowrap text-center text-[10px] font-semibold">Account Info</span>
               </div>
-              <div className={`h-[2px] w-8 ${regStep >= 2 ? 'bg-[#82AB85]' : 'bg-gray-300'}`}></div>
-              <div className="flex flex-col items-center">
+              <div className={`mt-4 h-[2px] min-w-3 flex-1 ${regStep >= 2 ? 'bg-[#82AB85]' : 'bg-gray-300'}`}></div>
+              <div className="flex min-w-0 flex-col items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${regStep >= 2 ? 'bg-[#82AB85] text-white' : 'bg-gray-300 text-gray-600'}`}>
                   2
                 </div>
-                <span className="text-[10px] font-semibold mt-1">Verification</span>
+                <span className="mt-1 whitespace-nowrap text-center text-[10px] font-semibold">Verification</span>
               </div>
-              <div className={`h-[2px] w-8 ${regStep >= 3 ? 'bg-[#82AB85]' : 'bg-gray-300'}`}></div>
-              <div className="flex flex-col items-center">
+              <div className={`mt-4 h-[2px] min-w-3 flex-1 ${regStep >= 3 ? 'bg-[#82AB85]' : 'bg-gray-300'}`}></div>
+              <div className="flex min-w-0 flex-col items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${regStep === 3 ? 'bg-[#82AB85] text-white' : 'bg-gray-300 text-gray-600'}`}>
                   3
                 </div>
-                <span className="text-[10px] font-semibold mt-1">Review</span>
+                <span className="mt-1 whitespace-nowrap text-center text-[10px] font-semibold">Review</span>
               </div>
             </div>
           </div>
 
           {/* Form Body (Scrollable) */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
+          <div ref={registrationBodyRef} className="boardmate-registration-body min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4 no-scrollbar">
             
             {/* STEP 1: Account Info */}
             {regStep === 1 && (
@@ -1329,7 +1373,7 @@ export default function App() {
           </div>
 
           {/* Footer Buttons */}
-          <div className="p-4 bg-[#F8F6F0] border-t border-gray-200/60 space-y-2">
+          <div className="boardmate-registration-footer shrink-0 border-t border-gray-200/60 bg-[#F8F6F0] px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2">
             {regStep < 3 ? (
               <button 
                 type="button"
@@ -1356,7 +1400,7 @@ export default function App() {
                 if (regStep > 1) setRegStep(prev => prev - 1);
                 else setCurrentScreen('SIGNUP_ROLE');
               }}
-              className="w-full py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 transition cursor-pointer"
+              className="min-h-11 w-full py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 transition cursor-pointer"
             >
               <i className="fa-solid fa-arrow-left mr-1"></i> Back
             </button>

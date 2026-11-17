@@ -15,9 +15,10 @@ function row(id, contact = 'alice', extra = {}) {
     attachment_path: null, attachment_mime: null, deleted_at: null, ...extra };
 }
 
-async function fixture(rows, { hidden = [], conversations = [], reactions = [] } = {}) {
+async function fixture(rows, { hidden = [], conversations = [], reactions = [], insertError = null } = {}) {
   const calls = [];
   const signed = [];
+  const inserted = [];
   const tables = {
     direct_messages: rows,
     direct_message_hidden_conversations: conversations.map(value => ({ user_id: 'me', ...value })),
@@ -25,17 +26,31 @@ async function fixture(rows, { hidden = [], conversations = [], reactions = [] }
     direct_message_reactions: reactions,
   };
   const client = {
-    rpc: async () => ({ data: ['alice', 'bob', 'me'].map(user_id => ({ user_id, full_name: user_id })), error: null }),
-    storage: { from: () => ({ createSignedUrl: async path => {
-      signed.push(path);
-      return { data: { signedUrl: `signed:${path}` }, error: null };
-    } }) },
+    rpc: async name => name === 'is_boardmate_account_active'
+      ? { data: true, error: null }
+      : { data: ['alice', 'bob', 'me'].map(user_id => ({ user_id, full_name: user_id })), error: null },
+    storage: { from: () => ({
+      createSignedUrl: async path => {
+        signed.push(path);
+        return { data: { signedUrl: `signed:${path}` }, error: null };
+      },
+      download: async () => ({ data: new Blob(['forwarded attachment']), error: null }),
+      upload: async () => ({ error: null }),
+    }) },
     from(table) {
       const filters = [];
       const orders = [];
       let limit = Infinity;
       const query = {
         select() { return this; },
+        insert(value) { inserted.push({ table, value }); return this; },
+        single() {
+          if (insertError) return Promise.resolve({ data: null, error: insertError });
+          const value = inserted[inserted.length - 1].value;
+          const data = { id: String(inserted.length), ...value, created_at: new Date().toISOString(), seen_at: null, deleted_at: null };
+          tables.direct_messages.push(data);
+          return Promise.resolve({ data, error: null });
+        },
         eq(column, value) { filters.push(valueRow => valueRow[column] === value); return this; },
         gt(column, value) { filters.push(valueRow => valueRow[column] > value); return this; },
         in(column, values) { filters.push(valueRow => values.includes(valueRow[column])); return this; },
@@ -73,7 +88,7 @@ async function fixture(rows, { hidden = [], conversations = [], reactions = [] }
   globalThis.messageTestClient = client;
   const api = await import(`data:text/javascript;base64,${Buffer.from(source + `\n// fixture ${moduleNumber++}`).toString('base64')}`);
   delete globalThis.messageTestClient;
-  return { api, calls, signed, tables };
+  return { api, calls, signed, tables, inserted };
 }
 
 test('latest history beyond 500 and all older pages have no omissions or duplicates', async () => {
@@ -162,6 +177,76 @@ test('empty and self conversations work with the same pagination', async () => {
   const inbox = await api.fetchDirectInbox('me');
   assert.equal(inbox[0].name, 'You');
   assert.equal(inbox[0].unreadCount, 0);
+});
+
+test('forwarding returns the persisted recipient record without depending on a preview URL', async () => {
+  const { api, signed, inserted } = await fixture([]);
+  const forwarded = await api.shareDirectMessage('me', 'bob', {
+    id: 'source-1',
+    text: '',
+    deletedAt: null,
+    attachmentPath: 'alice/me/photo.jpg',
+    attachmentMime: 'image/jpeg',
+    attachmentName: 'photo.jpg',
+  });
+  assert.equal(inserted.length, 1);
+  assert.equal(inserted[0].value.is_forwarded, true);
+  assert.equal(forwarded.id, '1');
+  assert.equal(forwarded.recipient_id, 'bob');
+  assert.equal(inserted[0].value.body, null);
+  assert.ok(inserted[0].value.attachment_path.startsWith('me/bob/'));
+  assert.equal(inserted[0].value.attachment_mime, 'image/jpeg');
+  assert.equal(inserted[0].value.attachment_name, 'photo.jpg');
+  assert.equal(signed.length, 0);
+});
+
+test('forwarding preserves generic file attachments and supplies a fallback MIME type when missing', async () => {
+  for (const [mime, expectedMime] of [['application/pdf', 'application/pdf'], [null, 'application/octet-stream']]) {
+    const { api, inserted } = await fixture([]);
+    const forwarded = await api.shareDirectMessage('me', 'bob', {
+      id: `source-${expectedMime}`,
+      text: '',
+      deletedAt: null,
+      attachmentPath: 'alice/me/document.pdf',
+      attachmentMime: mime,
+      attachmentName: 'document.pdf',
+    });
+    assert.equal(forwarded.recipient_id, 'bob');
+    assert.equal(inserted[0].value.attachment_mime, expectedMime);
+    assert.equal(inserted[0].value.attachment_name, 'document.pdf');
+    assert.ok(inserted[0].value.attachment_path.startsWith('me/bob/'));
+  }
+});
+
+test('ordinary messages still reject unsupported attachment types', async () => {
+  const { api } = await fixture([]);
+  await assert.rejects(
+    api.sendDirectMessage('me', 'bob', '', new File(['document'], 'document.pdf', { type: 'application/pdf' })),
+    /Choose a supported/,
+  );
+});
+
+test('concurrent forwards of the same message to the same contact insert only once', async () => {
+  const { api, inserted } = await fixture([]);
+  const message = { id: 'source-2', text: 'Forward once', deletedAt: null };
+  const [first, second] = await Promise.all([
+    api.shareDirectMessage('me', 'bob', message),
+    api.shareDirectMessage('me', 'bob', message),
+  ]);
+  assert.equal(inserted.length, 1);
+  assert.equal(first.id, second.id);
+  assert.equal(first.recipient_id, 'bob');
+});
+
+test('forwarding rejects when the message insert fails', async () => {
+  const { api } = await fixture([], { insertError: new Error('insert failed') });
+  await assert.rejects(api.shareDirectMessage('me', 'bob', {
+    id: 'source-3',
+    text: 'Forward this text',
+    deletedAt: null,
+    attachmentPath: null,
+    attachmentMime: null,
+  }), /insert failed/);
 });
 
 test('audio/video attachment URLs remain stable across polling, expire safely, and disappear when unsent', async () => {

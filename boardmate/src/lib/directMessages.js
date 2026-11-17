@@ -5,6 +5,7 @@ const attachmentBucket = 'direct-message-attachments';
 const reportEvidenceBucket = 'direct-message-report-evidence';
 const directMessageColumns = 'id, sender_id, recipient_id, body, created_at, seen_at, attachment_path, attachment_mime, attachment_name, deleted_at, is_forwarded';
 const maxAttachmentSize = 20 * 1024 * 1024;
+const pendingForwards = new Map();
 // Polling must not replace a playing element's src every few seconds.
 const attachmentUrls = new Map();
 async function messageAttachmentUrl(path, userId) {
@@ -247,11 +248,11 @@ export async function assertDirectContactAvailable(userId, contactId) {
   }
 }
 
-export async function sendDirectMessage(userId, contactId, body, file = null, isForwarded = false) {
+export async function sendDirectMessage(userId, contactId, body, file = null, isForwarded = false, { mapResponse = true } = {}) {
   const normalizedBody = body.trim();
   if (!normalizedBody && !file) throw new Error('Write a message or attach a photo, video, or audio file.');
   if (normalizedBody.length > 2000) throw new Error('Messages must be 2,000 characters or fewer.');
-  if (file && !allowedAttachmentTypes.has(file.type)) {
+  if (file && !allowedAttachmentTypes.has(file.type) && !isForwarded) {
     throw new Error('Choose a supported JPG, PNG, WEBP, GIF, MP4, WEBM, MOV, MP3, M4A, WAV, OGG, or AAC file.');
   }
   if (file && file.size > maxAttachmentSize) {
@@ -296,7 +297,8 @@ export async function sendDirectMessage(userId, contactId, body, file = null, is
     throw error;
   }
 
-  return mapDirectMessage(data, userId);
+  if (!data) throw new Error('The server did not confirm that this message was saved.');
+  return mapResponse ? mapDirectMessage(data, userId) : data;
 }
 
 export async function unsendDirectMessage(messageId, forEveryone) {
@@ -324,16 +326,31 @@ export async function reactToDirectMessage(messageId, reaction) {
 }
 
 export async function shareDirectMessage(userId, contactId, message) {
-  let attachment = null;
-  if (message.attachmentPath && message.attachmentMime) {
-    const { data, error } = await supabase.storage
-      .from(attachmentBucket)
-      .download(message.attachmentPath);
-    if (error) throw error;
-    const fileName = message.attachmentName || `shared-message.${message.attachmentMime.split('/')[1] || 'bin'}`;
-    attachment = new File([data], fileName, { type: message.attachmentMime });
+  if (!message?.id) throw new Error('This message could not be identified for forwarding.');
+  const requestKey = `${userId}:${contactId}:${message.id}`;
+  const pendingRequest = pendingForwards.get(requestKey);
+  if (pendingRequest) return pendingRequest;
+
+  const request = (async () => {
+    let attachment = null;
+    if (message.attachmentPath) {
+      const { data, error } = await supabase.storage
+        .from(attachmentBucket)
+        .download(message.attachmentPath);
+      if (error) throw error;
+      const attachmentMime = message.attachmentMime || 'application/octet-stream';
+      const fileName = message.attachmentName || `shared-message.${attachmentMime.split('/')[1] || 'bin'}`;
+      attachment = new File([data], fileName, { type: attachmentMime });
+    }
+    return sendDirectMessage(userId, contactId, message.deletedAt ? '' : message.text || '', attachment, true, { mapResponse: false });
+  })();
+
+  pendingForwards.set(requestKey, request);
+  try {
+    return await request;
+  } finally {
+    if (pendingForwards.get(requestKey) === request) pendingForwards.delete(requestKey);
   }
-  return sendDirectMessage(userId, contactId, message.deletedAt ? '' : message.text || '', attachment, true);
 }
 
 export async function markDirectConversationSeen(contactId) {

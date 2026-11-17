@@ -52,6 +52,7 @@ import { fetchBoardmateMessageContact } from '../lib/publicProfiles';
 import { fetchAccountPreferences, saveSearchPreferences } from '../lib/accountTools';
 import { removeRoommatePostPhotos, uploadRoommatePostPhotos } from '../lib/roommatePostMedia';
 import { fetchListingRatingSummary, saveListingRating } from '../lib/listingRatings';
+import { loadVerificationStatus } from '../lib/verificationStatus';
 import ListingRating from './ListingRating';
 import usePullToRefresh from '../hooks/usePullToRefresh';
 import useMessageHistory from '../hooks/useMessageHistory';
@@ -186,6 +187,7 @@ export default function RenterDashboard({ user, onProfileUpdate, onVerificationS
   const [shareTargetMessage, setShareTargetMessage] = useState(null);
   const [shareSearch, setShareSearch] = useState('');
   const [sharingMessage, setSharingMessage] = useState(false);
+  const shareRequestRef = useRef(false);
   const [blockConfirmationOpen, setBlockConfirmationOpen] = useState(false);
   const [blockTargetContact, setBlockTargetContact] = useState(null);
   const [messageActionConfirmation, setMessageActionConfirmation] = useState(null);
@@ -573,14 +575,18 @@ export default function RenterDashboard({ user, onProfileUpdate, onVerificationS
     if (!user?.id) return;
     setLoadingData(true);
     try {
-      const [marketplaceData, photos, allLikesResult, ownLikesResult] = await Promise.all([
+      const [marketplaceData, photos, allLikesResult, ownLikesResult, notifications, accountStatus, allFavoritesResult, ownFavoritesResult] = await Promise.all([
         fetchMarketplaceData(),
         fetchProfilePhotoGallery(user.id),
         supabase.from('roommate_post_likes').select('post_id'),
         supabase.from('roommate_post_likes').select('post_id').eq('user_id', user.id),
+        fetchBoardmateNotifications(user.id),
+        loadVerificationStatus(supabase, user.id),
+        supabase.from('listing_favorites').select('listing_id'),
+        supabase.from('listing_favorites').select('listing_id').eq('user_id', user.id),
       ]);
-      if (allLikesResult.error || ownLikesResult.error) {
-        throw allLikesResult.error || ownLikesResult.error;
+      if (allLikesResult.error || ownLikesResult.error || allFavoritesResult.error || ownFavoritesResult.error) {
+        throw allLikesResult.error || ownLikesResult.error || allFavoritesResult.error || ownFavoritesResult.error;
       }
 
       const counts = {};
@@ -592,6 +598,21 @@ export default function RenterDashboard({ user, onProfileUpdate, onVerificationS
       setProfilePhotos(photos);
       setRoommateLikeCounts(counts);
       setLikedRoommatePostIds(new Set(ownLikesResult.data.map(like => like.post_id)));
+      const favoriteCounts = {};
+      for (const favorite of allFavoritesResult.data) {
+        favoriteCounts[favorite.listing_id] = (favoriteCounts[favorite.listing_id] || 0) + 1;
+      }
+      setListingFavoriteCounts(favoriteCounts);
+      setFavoriteIds(ownFavoritesResult.data.map(favorite => favorite.listing_id));
+      setModerationNotifications(notifications);
+      setNotificationTime(Date.now());
+      onProfileUpdate?.(current => current?.id === user.id ? {
+        ...current,
+        verificationStatus: accountStatus.status || 'not_submitted',
+        verificationReason: accountStatus.reason || '',
+        suspendedAt: accountStatus.suspendedAt || null,
+        suspensionReason: accountStatus.suspensionReason || '',
+      } : current);
 
       if (activeTab === 'messages') {
         const inbox = await fetchDirectInbox(user.id);
@@ -1459,18 +1480,30 @@ export default function RenterDashboard({ user, onProfileUpdate, onVerificationS
   };
 
   const shareMessageToContact = async (contact) => {
-    if (!shareTargetMessage || !user?.id || sharingMessage) return;
+    if (!shareTargetMessage || !user?.id || sharingMessage || shareRequestRef.current) return;
+    shareRequestRef.current = true;
     setSharingMessage(true);
+    setDashboardError('');
     try {
-      await shareDirectMessage(user.id, contact.userId, shareTargetMessage);
-      setShareTargetMessage(null);
-      setShareSearch('');
-      setDashboardError(`Message shared with ${contact.name}.`);
-      setMessageContacts(await fetchDirectInbox(user.id));
+      const forwarded = await shareDirectMessage(user.id, contact.userId, shareTargetMessage);
+      if (!forwarded?.id || forwarded.recipient_id !== contact.userId) {
+        throw new Error('The forwarded message could not be confirmed for the selected recipient.');
+      }
     } catch (error) {
       setDashboardError(`Unable to share message: ${error.message}`);
+      return;
     } finally {
+      shareRequestRef.current = false;
       setSharingMessage(false);
+    }
+    setShareTargetMessage(null);
+    setShareSearch('');
+    setDashboardError('');
+    notify('Your message has been successfully forwarded.', 'Message Forwarded Successfully', 'success');
+    try {
+      setMessageContacts(await fetchDirectInbox(user.id));
+    } catch (error) {
+      setMessageSyncNotice(`Message was forwarded, but the inbox could not refresh: ${error.message}`);
     }
   };
 
@@ -1595,10 +1628,11 @@ export default function RenterDashboard({ user, onProfileUpdate, onVerificationS
     }
   };
 
-  if (publicProfileUserId) return <PublicProfileDialog key={publicProfileUserId} userId={publicProfileUserId} onClose={() => setPublicProfileUserId(null)} />;
+  if (publicProfileUserId) return <>{pullRefreshIndicator}<PublicProfileDialog key={publicProfileUserId} userId={publicProfileUserId} onClose={() => setPublicProfileUserId(null)} /></>;
   if (selectedRoommatePost || profilePostPreview) {
     const post = selectedRoommatePost || profilePostPreview;
     return <>
+      {pullRefreshIndicator}
       <RoommatePostPage post={post} onBack={() => { setMediaPreview(null); setSelectedRoommatePost(null); setProfilePostPreview(null); }} onPreviewMedia={setMediaPreview}
         isLiked={likedRoommatePostIds.has(post.id)} likeCount={roommateLikeCounts[post.id] || 0} likePending={likeActionPostId === post.id}
         isSuspended={Boolean(user?.suspendedAt)} onToggleLike={() => toggleRoommatePostLike(post.id)}
@@ -1612,6 +1646,7 @@ export default function RenterDashboard({ user, onProfileUpdate, onVerificationS
     </>;
   }
   if (selectedListing) return <>
+    {pullRefreshIndicator}
     <AccommodationDetailPage listing={selectedListing} onBack={() => { setMediaPreview(null); setSelectedListing(null); }} onPreviewMedia={setMediaPreview}
       rating={<ListingRating listingTitle={selectedListing.title} average={selectedListing.ratingAverage} count={selectedListing.ratingCount} myRating={selectedListing.myRating}
         disabled={Boolean(user?.suspendedAt)} saving={ratingActionListingId === selectedListing.id} onRate={rating => rateListing(selectedListing.id, rating)} />}
@@ -1627,7 +1662,7 @@ export default function RenterDashboard({ user, onProfileUpdate, onVerificationS
     <ErrorDialog message={dashboardError} onClose={() => setDashboardError('')} />
   </>;
 
-  if (accountToolsOpen) return <AccountToolsDialog
+  if (accountToolsOpen) return <>{pullRefreshIndicator}<AccountToolsDialog
           userId={user.id}
           userProfile={user}
           onProfileUpdate={onProfileUpdate}
@@ -1640,8 +1675,8 @@ export default function RenterDashboard({ user, onProfileUpdate, onVerificationS
           onError={message => setDashboardError(message)}
           onLogout={onLogout}
           onClose={() => setAccountToolsOpen(false)}
-        />;
-  if (notificationsOpen) return <NotificationsPage error={dashboardError} onDismissError={() => setDashboardError('')} notifications={visibleNotifications} onBack={() => setNotificationsOpen(false)} onDelete={deleteNotification} onHide={hideNotification} onOpen={openNotification} />;
+        /></>;
+  if (notificationsOpen) return <>{pullRefreshIndicator}<NotificationsPage error={dashboardError} onDismissError={() => setDashboardError('')} notifications={visibleNotifications} onBack={() => setNotificationsOpen(false)} onDelete={deleteNotification} onHide={hideNotification} onOpen={openNotification} /></>;
 
   return (
     <div className="boardmate-user-dashboard w-full h-full bg-[#F7F4EB] text-gray-800 font-sans flex flex-col justify-between relative overflow-hidden">

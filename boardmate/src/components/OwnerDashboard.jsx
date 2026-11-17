@@ -47,6 +47,7 @@ import NotificationsPage from './NotificationsPage';
 import { defaultListingFilters, filterListings, getPopularListingLocations } from '../lib/listingSearch';
 import { fetchAccountPreferences, saveSearchPreferences } from '../lib/accountTools';
 import { fetchListingRatingSummary } from '../lib/listingRatings';
+import { loadVerificationStatus } from '../lib/verificationStatus';
 import usePullToRefresh from '../hooks/usePullToRefresh';
 import useMessageHistory from '../hooks/useMessageHistory';
 import { listingMedia as getListingMedia } from '../lib/listingDetails';
@@ -101,6 +102,7 @@ export default function OwnerDashboard({ userProfile, onProfileUpdate, onVerific
   const [shareTargetMessage, setShareTargetMessage] = useState(null);
   const [shareSearch, setShareSearch] = useState('');
   const [sharingMessage, setSharingMessage] = useState(false);
+  const shareRequestRef = useRef(false);
   const [blockConfirmationOpen, setBlockConfirmationOpen] = useState(false);
   const [blockTargetContact, setBlockTargetContact] = useState(null);
   const [messageActionConfirmation, setMessageActionConfirmation] = useState(null);
@@ -603,12 +605,40 @@ export default function OwnerDashboard({ userProfile, onProfileUpdate, onVerific
     if (!userId) return;
     setLoadingListings(true);
     try {
-      const [listings, photos] = await Promise.all([
+      const [listings, photos, notifications, accountStatus] = await Promise.all([
         fetchOwnerListings(userId),
         fetchProfilePhotoGallery(userId),
+        fetchBoardmateNotifications(userId),
+        loadVerificationStatus(supabase, userId),
       ]);
       setMyListings(listings);
       setProfilePhotos(photos);
+      setModerationNotifications(notifications);
+      setNotificationTime(Date.now());
+      onProfileUpdate?.(current => current?.id === userId ? {
+        ...current,
+        verificationStatus: accountStatus.status || 'not_submitted',
+        verificationReason: accountStatus.reason || '',
+        suspendedAt: accountStatus.suspendedAt || null,
+        suspensionReason: accountStatus.suspensionReason || '',
+      } : current);
+
+      const listingIds = listings.map(listing => listing.id);
+      const favoritesResult = listingIds.length
+        ? await supabase.from('listing_favorites').select('listing_id').in('listing_id', listingIds)
+        : { data: [], error: null };
+      if (favoritesResult.error) throw favoritesResult.error;
+      const favoriteCounts = {};
+      favoritesResult.data.forEach(favorite => {
+        favoriteCounts[favorite.listing_id] = (favoriteCounts[favorite.listing_id] || 0) + 1;
+      });
+      setListingFavoriteCounts(favoriteCounts);
+
+      if (accountStatus.status === 'approved' && !accountStatus.suspendedAt) {
+        const viewsResult = await supabase.rpc('record_boardmate_profile_view', { p_owner_id: userId });
+        if (viewsResult.error) throw viewsResult.error;
+        setUniqueProfileViews(Number(viewsResult.data) || 0);
+      }
 
       if (activeTab === 'messages') {
         const inbox = await fetchDirectInbox(userId);
@@ -956,20 +986,34 @@ export default function OwnerDashboard({ userProfile, onProfileUpdate, onVerific
   };
 
   const shareMessageToContact = async (contact) => {
-    if (!shareTargetMessage || !userId || sharingMessage) return;
+    if (!shareTargetMessage || !userId || sharingMessage || shareRequestRef.current) return;
+    shareRequestRef.current = true;
     setSharingMessage(true);
+    setDashboardError('');
     try {
-      await shareDirectMessage(userId, contact.userId, shareTargetMessage);
-      setShareTargetMessage(null);
-      setShareSearch('');
-      setDashboardError(`Message shared with ${contact.name}.`);
-      recordActivity(userId, 'Shared message', `Shared with ${contact.sender || contact.name}.`).catch(error => setDashboardError(error.message));
+      const forwarded = await shareDirectMessage(userId, contact.userId, shareTargetMessage);
+      if (!forwarded?.id || forwarded.recipient_id !== contact.userId) {
+        throw new Error('The forwarded message could not be confirmed for the selected recipient.');
+      }
+    } catch (error) {
+      setDashboardError(`Unable to share message: ${error.message}`);
+      return;
+    } finally {
+      shareRequestRef.current = false;
+      setSharingMessage(false);
+    }
+    setShareTargetMessage(null);
+    setShareSearch('');
+    setDashboardError('');
+    notify('Your message has been successfully forwarded.', 'Message Forwarded Successfully', 'success');
+    recordActivity(userId, 'Shared message', `Shared with ${contact.sender || contact.name}.`).catch(error => {
+      setMessageSyncNotice(`Message was forwarded, but activity could not be recorded: ${error.message}`);
+    });
+    try {
       const inbox = await fetchDirectInbox(userId);
       setChats(inbox.map(item => ({ ...item, sender: item.name })));
     } catch (error) {
-      setDashboardError(`Unable to share message: ${error.message}`);
-    } finally {
-      setSharingMessage(false);
+      setMessageSyncNotice(`Message was forwarded, but the inbox could not refresh: ${error.message}`);
     }
   };
 
@@ -1260,10 +1304,11 @@ export default function OwnerDashboard({ userProfile, onProfileUpdate, onVerific
     }
   };
 
-  if (publicProfileUserId) return <PublicProfileDialog key={publicProfileUserId} userId={publicProfileUserId} onClose={() => setPublicProfileUserId(null)} />;
+  if (publicProfileUserId) return <>{pullRefreshIndicator}<PublicProfileDialog key={publicProfileUserId} userId={publicProfileUserId} onClose={() => setPublicProfileUserId(null)} /></>;
   if (profileListingPreview) {
     const listing = myListings.find(item => item.id === profileListingPreview.id) || profileListingPreview;
     return <>
+      {pullRefreshIndicator}
       <AccommodationDetailPage listing={listing} onBack={() => { setMediaPreview(null); setProfileListingPreview(null); }} onPreviewMedia={setMediaPreview}
         actions={listing.moderationStatus === 'approved' && <button type="button" disabled={Boolean(userProfile?.suspendedAt)} onClick={() => toggleAvailability(listing)}>{listing.available ? 'Mark unavailable' : 'Mark available'}</button>} />
       {mediaPreview && <MediaPreviewDialog media={mediaPreview} onClose={() => setMediaPreview(null)} />}
@@ -1271,7 +1316,7 @@ export default function OwnerDashboard({ userProfile, onProfileUpdate, onVerific
     </>;
   }
 
-  if (accountToolsOpen) return <AccountToolsDialog
+  if (accountToolsOpen) return <>{pullRefreshIndicator}<AccountToolsDialog
           userId={userId}
           userProfile={userProfile}
           onProfileUpdate={onProfileUpdate}
@@ -1284,8 +1329,8 @@ export default function OwnerDashboard({ userProfile, onProfileUpdate, onVerific
           onError={message => setDashboardError(message)}
           onLogout={onLogout}
           onClose={() => setAccountToolsOpen(false)}
-        />;
-  if (notificationsOpen) return <NotificationsPage error={dashboardError} onDismissError={() => setDashboardError('')} notifications={visibleNotifications} onBack={() => setNotificationsOpen(false)} onDelete={deleteNotification} onHide={hideNotification} onOpen={openNotification} />;
+        /></>;
+  if (notificationsOpen) return <>{pullRefreshIndicator}<NotificationsPage error={dashboardError} onDismissError={() => setDashboardError('')} notifications={visibleNotifications} onBack={() => setNotificationsOpen(false)} onDelete={deleteNotification} onHide={hideNotification} onOpen={openNotification} /></>;
 
   return (
     <div className="boardmate-user-dashboard relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-[#FAF6EE] font-sans text-gray-800">

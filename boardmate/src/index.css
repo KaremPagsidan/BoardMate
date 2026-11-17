@@ -45,14 +45,83 @@ body {
   height: 100dvh;
 }
 
+.boardmate-viewport {
+  min-height: var(--bm-mobile-viewport-height, 100dvh);
+}
+.boardmate-app-shell {
+  height: var(--bm-mobile-viewport-height, 100dvh);
+}
+
+.boardmate-desktop-refresh-button {
+  display: grid;
+}
+@media (max-width: 639px), (max-device-width: 1024px) and (hover: none) and (pointer: coarse) {
+  .boardmate-desktop-refresh-button {
+    display: none;
+  }
+}
+
+.boardmate-registration {
+  min-height: 0;
+  min-width: 0;
+}
+.boardmate-registration-stepper > * {
+  flex-shrink: 0;
+}
+.boardmate-registration-body {
+  scroll-padding-block: 16px;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+.boardmate-registration :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+  scroll-margin-block: 32px;
+}
+.boardmate-registration :is(button, input, select, textarea) {
+  overflow-wrap: anywhere;
+}
+.boardmate-registration :is(label, p, span) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.boardmate-refresh-spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: boardmate-refresh-spin 700ms linear infinite;
+}
+@keyframes boardmate-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
 .boardmate-app-shell :is(img, video, audio, object) { max-width: 100%; }
 .boardmate-app-shell :is(input, select, textarea) { min-width: 0; }
 .boardmate-quick-actions > * { min-width: 0; min-height: 76px; overflow-wrap: anywhere; }
 .boardmate-quick-actions > button > span.font-bold { font-size: 11px; line-height: 1.4; }
 @container boardmate (max-width: 639px) {
   .boardmate-renter-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .boardmate-renter-actions > button { grid-column: auto; }
+  .boardmate-renter-actions {
+    grid-auto-rows: minmax(96px, auto);
+    gap: 12px;
+  }
+  .boardmate-renter-actions > button {
+    grid-column: auto;
+    min-height: 96px;
+    padding: 12px;
+    border-radius: 16px;
+    overflow-wrap: normal;
+    word-break: normal;
+    white-space: normal;
+  }
   .boardmate-renter-actions > button:last-child { grid-column: 1 / -1; }
+  .boardmate-renter-actions > button > span:last-of-type {
+    font-size: 12px;
+    line-height: 1.25;
+  }
 }
 .boardmate-app-shell :is([role='dialog'], [role='alertdialog']) {
   min-width: 0;
@@ -110,9 +179,50 @@ body {
 
 @media (max-width: 639px) {
   .boardmate-app-shell {
+    height: var(--bm-mobile-viewport-height, 100dvh);
     padding-top: env(safe-area-inset-top, 0px);
     padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .boardmate-viewport {
+    align-items: flex-start;
+  }
+
+  .boardmate-registration :is(input, select, textarea) {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 639px) and (max-height: 640px) {
+  .boardmate-registration-header {
+    padding-block: 0.5rem;
+  }
+
+  .boardmate-registration-header h2 {
+    font-size: 1.125rem;
+    line-height: 1.4;
+  }
+
+  .boardmate-registration-header > p {
+    line-height: 1.35;
+  }
+
+  .boardmate-registration-stepper {
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+  }
+
+  .boardmate-registration-body {
+    padding-block: 0.75rem;
+  }
+
+  .boardmate-registration-footer {
+    padding-top: 0.5rem;
+  }
+
+  .boardmate-registration-footer > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.375rem;
   }
 }
 
@@ -259,6 +369,14 @@ button:not(:disabled):active {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .boardmate-registration-body {
+    scroll-behavior: auto;
+  }
+
+  .boardmate-refresh-spinner {
+    animation: none;
+  }
+
   .splash-card,
   .splash-logo,
   .welcome-brand-card,

@@ -141,6 +141,21 @@ try {
         await evaluate(`document.querySelector('[aria-label="Close preview"]').click()`);
       } else if (kind === 'actions') {
         assert.ok(await evaluate(`getComputedStyle(document.querySelector('.boardmate-renter-actions')).gridTemplateColumns.split(' ').length === 2`), 'Quick Actions have two mobile columns');
+        const cards = await evaluate(`(() => {
+          const grid = document.querySelector('.boardmate-renter-actions');
+          const buttons = Array.from(grid.children);
+          const boxes = buttons.map(button => button.getBoundingClientRect());
+          return {
+            equalActionCards: boxes.slice(0, 4).every(box => Math.abs(box.width - boxes[0].width) < 1 && Math.abs(box.height - boxes[0].height) < 1),
+            notificationsFullWidth: boxes[4].width >= grid.getBoundingClientRect().width - 1,
+            notificationsBelow: boxes[4].top >= boxes[3].bottom,
+            labelsFit: buttons.every(button => {
+              const label = button.querySelector('span:last-of-type');
+              return label && label.scrollWidth <= label.clientWidth + 1 && label.getBoundingClientRect().height > 0;
+            }),
+          };
+        })()`);
+        assert.ok(cards.equalActionCards && cards.notificationsFullWidth && cards.notificationsBelow && cards.labelsFit, `Quick Action cards stay aligned and readable at ${width}px: ${JSON.stringify(cards)}`);
       } else {
         assert.equal(await evaluate(`Boolean(document.querySelector('[role="dialog"], [aria-modal="true"]'))`), false, 'Post details are pages with no modal semantics');
         assert.ok(await evaluate(`(() => {
@@ -179,7 +194,159 @@ try {
       }
       checks++;
     }
+    for (const role of ['RENTER', 'OWNER']) {
+      for (const step of [1, 2, 3]) {
+        await evaluate(`window.showFixture('registration'); window.setRegistrationState(${JSON.stringify(role)}, ${step})`);
+        await pause(100);
+        const registration = await evaluate(`(() => {
+          const shell = document.querySelector('.boardmate-app-shell').getBoundingClientRect();
+          const form = document.querySelector('.boardmate-registration').getBoundingClientRect();
+          const footer = document.querySelector('.boardmate-registration footer').getBoundingClientRect();
+          const stepper = document.querySelector('.boardmate-registration-stepper');
+          const stepperBox = stepper.getBoundingClientRect();
+          const labels = Array.from(stepper.querySelectorAll('span > span:last-child'));
+          return {
+            noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth && document.querySelector('.boardmate-registration').scrollWidth <= document.querySelector('.boardmate-registration').clientWidth + 1,
+            formInsideShell: form.left >= shell.left - 1 && form.right <= shell.right + 1 && form.top >= shell.top - 1 && form.bottom <= shell.bottom + 1,
+            footerVisible: footer.top >= 0 && footer.bottom <= innerHeight,
+            stepperFits: stepperBox.left >= shell.left - 1 && stepperBox.right <= shell.right + 1 && labels.every(label => label.getBoundingClientRect().width > 0),
+            nextBackVisible: Array.from(document.querySelectorAll('.boardmate-registration footer button')).every(button => {
+              const box = button.getBoundingClientRect();
+              return box.height >= 44 && box.top >= 0 && box.bottom <= innerHeight;
+            }),
+          };
+        })()`);
+        assert.ok(registration.noHorizontalOverflow && registration.formInsideShell && registration.footerVisible && registration.stepperFits && registration.nextBackVisible, `${role} registration step ${step} fits at ${width}px: ${JSON.stringify(registration)}`);
+        if (step === 1) {
+          await evaluate(`(() => {
+            const body = document.querySelector('.boardmate-registration-body');
+            const inputs = body.querySelectorAll('input');
+            body.scrollTop = 0;
+            inputs[inputs.length - 1].focus();
+            inputs[inputs.length - 1].scrollIntoView({ block: 'center', inline: 'nearest' });
+          })()`);
+          await pause(600);
+          const fieldVisibility = await evaluate(`(() => {
+            const body = document.querySelector('.boardmate-registration-body');
+            const inputs = body.querySelectorAll('input');
+            const lastInput = inputs[inputs.length - 1];
+            return {
+              canScroll: body.scrollHeight > body.clientHeight,
+              visible: lastInput.getBoundingClientRect().bottom <= body.getBoundingClientRect().bottom + 1,
+            };
+          })()`);
+          assert.ok(fieldVisibility.visible && (role === 'RENTER' || fieldVisibility.canScroll), `${role} account fields remain scrollable and focus-visible at ${width}px: ${JSON.stringify(fieldVisibility)}`);
+        }
+        checks++;
+      }
+    }
   }
+  await command('Emulation.setDeviceMetricsOverride', { width: 320, height: 360, deviceScaleFactor: 1, mobile: true });
+  for (const role of ['RENTER', 'OWNER']) {
+    for (const step of [1, 2, 3]) {
+      await evaluate(`window.showFixture('registration'); window.setRegistrationState(${JSON.stringify(role)}, ${step})`);
+      await pause(100);
+      const keyboardViewport = await evaluate(`(() => {
+        const shell = document.querySelector('.boardmate-app-shell').getBoundingClientRect();
+        const form = document.querySelector('.boardmate-registration');
+        const header = document.querySelector('.boardmate-registration-header').getBoundingClientRect();
+        const body = document.querySelector('.boardmate-registration-body');
+        const bodyBox = body.getBoundingClientRect();
+        const footerElement = document.querySelector('.boardmate-registration-footer');
+        const footer = footerElement.getBoundingClientRect();
+        if (${step} === 1) {
+          const inputs = body.querySelectorAll('input');
+          const input = inputs[inputs.length - 1];
+          body.scrollTop = 0;
+          input.focus();
+          input.scrollIntoView({ block: 'center', inline: 'nearest' });
+        }
+        return {
+          viewportHeight: visualViewport.height,
+          shellHeight: shell.height,
+          noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth && form.scrollWidth <= form.clientWidth + 1,
+          contentDoesNotOverlap: bodyBox.top >= header.bottom - 1 && bodyBox.bottom <= footer.top + 1,
+          footerInViewport: footer.top >= 0 && footer.bottom <= visualViewport.height,
+          footerInFlow: getComputedStyle(footerElement).position !== 'fixed',
+          buttonsAccessible: Array.from(footerElement.querySelectorAll('button')).every(button => {
+            const box = button.getBoundingClientRect();
+            return box.height >= 44 && box.top >= 0 && box.bottom <= visualViewport.height;
+          }),
+        };
+      })()`);
+      if (step === 1) await pause(600);
+      const focusedFieldBounds = step !== 1 ? null : await evaluate(`(() => {
+        const body = document.querySelector('.boardmate-registration-body').getBoundingClientRect();
+        const inputs = document.querySelectorAll('.boardmate-registration-body input');
+        const input = inputs[inputs.length - 1];
+        const label = input.closest('label').getBoundingClientRect();
+        const field = input.getBoundingClientRect();
+        return { visible: label.top >= body.top - 1 && field.bottom <= body.bottom + 1, bodyTop: body.top, bodyBottom: body.bottom, labelTop: label.top, labelBottom: label.bottom, fieldTop: field.top, fieldBottom: field.bottom, scrollTop: input.closest('.boardmate-registration-body').scrollTop };
+      })()`);
+      const focusedFieldVisible = step !== 1 || focusedFieldBounds.visible;
+      assert.ok(keyboardViewport.viewportHeight <= 360
+        && keyboardViewport.shellHeight <= 361
+        && keyboardViewport.noHorizontalOverflow
+        && keyboardViewport.contentDoesNotOverlap
+        && keyboardViewport.footerInViewport
+        && keyboardViewport.footerInFlow
+        && keyboardViewport.buttonsAccessible
+        && focusedFieldVisible,
+      `${role} registration step ${step} remains usable with a reduced keyboard viewport: ${JSON.stringify({ ...keyboardViewport, focusedFieldBounds })}`);
+    }
+  }
+  await command('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  const dispatchTouch = (type, x, y) => command('Input.dispatchTouchEvent', {
+    type,
+    touchPoints: type === 'touchEnd' ? [] : [{ x, y, radiusX: 2, radiusY: 2, force: 1, id: 0 }],
+  });
+  await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  await evaluate(`window.showFixture('registration'); window.setRegistrationState('OWNER', 1); window.pullToRefreshCount = 0`);
+  await pause(100);
+  const desktopScrollPoint = await evaluate(`(() => {
+    const body = document.querySelector('.boardmate-registration-body');
+    body.scrollTop = 0;
+    const box = body.getBoundingClientRect();
+    return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + Math.min(box.height / 2, 80)) };
+  })()`);
+  await dispatchTouch('touchStart', desktopScrollPoint.x, desktopScrollPoint.y);
+  await dispatchTouch('touchMove', desktopScrollPoint.x, desktopScrollPoint.y + 120);
+  await dispatchTouch('touchEnd', desktopScrollPoint.x, desktopScrollPoint.y + 120);
+  await pause(50);
+  assert.equal(await evaluate('window.pullToRefreshCount'), 0, 'Pull-to-refresh stays disabled on desktop');
+  await command('Emulation.setDeviceMetricsOverride', { width: 320, height: 360, deviceScaleFactor: 1, mobile: true });
+  await evaluate(`window.showFixture('registration'); window.setRegistrationState('RENTER', 1); window.pullToRefreshCount = 0; window.pullToRefreshFails = false`);
+  await pause(100);
+  const mobileScrollPoint = await evaluate(`(() => {
+    const body = document.querySelector('.boardmate-registration-body');
+    body.scrollTop = 0;
+    const box = body.getBoundingClientRect();
+    return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
+  })()`);
+  await dispatchTouch('touchStart', mobileScrollPoint.x, mobileScrollPoint.y);
+  await dispatchTouch('touchMove', mobileScrollPoint.x, mobileScrollPoint.y + 120);
+  assert.match(await evaluate(`document.querySelector('[role="status"]')?.textContent || ''`), /Release to refresh/);
+  await dispatchTouch('touchEnd', mobileScrollPoint.x, mobileScrollPoint.y + 120);
+  await pause(50);
+  assert.match(await evaluate(`document.querySelector('[role="status"]')?.textContent || ''`), /Refreshing/);
+  assert.ok(await evaluate(`Boolean(document.querySelector('.boardmate-refresh-spinner'))`), 'Mobile refresh shows a spinner while loading');
+  await pause(150);
+  assert.match(await evaluate(`document.querySelector('[role="status"]')?.textContent || ''`), /Updated/);
+  assert.equal(await evaluate('window.pullToRefreshCount'), 1, 'Mobile pull refresh runs once');
+  await evaluate(`document.querySelector('.boardmate-registration-body').scrollTop = 20`);
+  await dispatchTouch('touchStart', mobileScrollPoint.x, mobileScrollPoint.y);
+  await dispatchTouch('touchMove', mobileScrollPoint.x, mobileScrollPoint.y + 120);
+  await dispatchTouch('touchEnd', mobileScrollPoint.x, mobileScrollPoint.y + 120);
+  await pause(50);
+  assert.equal(await evaluate('window.pullToRefreshCount'), 1, 'Pull-to-refresh does not run from a scrolled page');
+  await evaluate(`document.querySelector('.boardmate-registration-body').scrollTop = 0; window.pullToRefreshFails = true`);
+  await dispatchTouch('touchStart', mobileScrollPoint.x, mobileScrollPoint.y);
+  await dispatchTouch('touchMove', mobileScrollPoint.x, mobileScrollPoint.y + 120);
+  await dispatchTouch('touchEnd', mobileScrollPoint.x, mobileScrollPoint.y + 120);
+  await pause(160);
+  assert.match(await evaluate(`document.querySelector('[role="status"]')?.textContent || ''`), /Could not refresh/);
+  assert.equal(await evaluate('window.pullToRefreshCount'), 2, 'Mobile refresh exposes a failed result without retrying');
+  await command('Emulation.setTouchEmulationEnabled', { enabled: false });
   await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await evaluate(`window.showFixture('desktop-listing')`);
   await pause(100);
@@ -192,7 +359,7 @@ try {
     await pause(100);
   }
   assert.ok(routed, 'The actual phone preview route mounts inside the shared frame');
-  console.log(`Passed ${checks} responsive cases at 320, 375, 390, 430 and desktop/short frame sizes, including zoom/scroll/Escape.`);
+  console.log(`Passed ${checks} responsive cases at 320, 375, 390, 430 and desktop/short frame sizes, including zoom/scroll/Escape and mobile pull-to-refresh.`);
 } finally {
   socket?.close();
   browser.kill();

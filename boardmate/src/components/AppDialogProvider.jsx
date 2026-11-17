@@ -13,7 +13,7 @@ export function AppNoticeDialog({ item, onAnswer }) {
     return () => node.close();
   }, []);
   return <dialog ref={dialog} className="bm-app-dialog" role="alertdialog" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message" onCancel={event => { event.preventDefault(); onAnswer(false); }}>
-    <h2 id="app-dialog-title">{uiText(item.title)}</h2>
+    <h2 id="app-dialog-title" className={item.variant === 'success' ? 'bm-app-dialog-title-success' : ''}>{uiText(item.title)}</h2>
     <p id="app-dialog-message">{uiText(item.message)}</p>
     <div className="bm-app-dialog-actions">
       {item.confirm && <button type="button" onClick={() => onAnswer(false)}>Cancel</button>}
@@ -25,8 +25,8 @@ export function AppNoticeDialog({ item, onAnswer }) {
 export default function AppDialogProvider({ children }) {
   const [queue, setQueue] = useState([]);
   const pending = useRef(new Map());
-  const notify = useCallback((message, title = 'Notification') => {
-    setQueue(current => [...current, { id: crypto.randomUUID(), message, title }]);
+  const notify = useCallback((message, title = 'Notification', variant = 'info') => {
+    setQueue(current => [...current, { id: crypto.randomUUID(), message, title, variant }]);
   }, []);
   const confirm = useCallback((message, title = 'Confirm action') => new Promise(resolve => {
     const id = crypto.randomUUID();

@@ -9,10 +9,12 @@ import { duplicateRegistrationMessage } from '../src/lib/registrationErrors.js';
 
 let server;
 let Dialog;
+let ErrorDialog;
 before(async () => {
   server = await createServer({ root: fileURLToPath(new URL('../', import.meta.url)), configFile: false, envDir: false,
     plugins: [react()], server: { middlewareMode: true, hmr: false }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } });
   Dialog = (await server.ssrLoadModule('/src/components/AppDialogProvider.jsx')).AppNoticeDialog;
+  ErrorDialog = (await server.ssrLoadModule('/src/components/ErrorDialog.jsx')).default;
 });
 after(async () => { await server?.close(); });
 
@@ -40,6 +42,32 @@ test('notifications render as labelled in-app dialogs with an acknowledgement ac
   assert.match(html, /Please use a different email address/);
   assert.match(html, />OK<\/button>/);
   assert.doesNotMatch(html, />Cancel<\/button>/);
+});
+test('message forwarding success uses the green success notification copy', () => {
+  const html = renderToStaticMarkup(createElement(Dialog, {
+    item: {
+      title: 'Message Forwarded Successfully',
+      message: 'Your message has been successfully forwarded.',
+      variant: 'success',
+    },
+    onAnswer() {},
+  }));
+  assert.match(html, /class="bm-app-dialog-title-success">Message Forwarded Successfully/);
+  assert.match(html, /Your message has been successfully forwarded\./);
+});
+test('legacy shared-message dialog renders as a green success instead of an error', () => {
+  const html = renderToStaticMarkup(createElement(ErrorDialog, {
+    message: 'Message shared with Ven Davandan.',
+    onClose() {},
+  }));
+  assert.match(html, /role="dialog"/);
+  assert.match(html, /text-emerald-800[^"]*">[\s\S]*Message Shared Successfully/);
+  assert.doesNotMatch(html, /Something went wrong/);
+});
+test('ordinary error dialogs retain the red error heading', () => {
+  const html = renderToStaticMarkup(createElement(ErrorDialog, { message: 'Message could not be sent.', onClose() {} }));
+  assert.match(html, /role="alertdialog"/);
+  assert.match(html, /text-red-800[^"]*">[\s\S]*Something went wrong/);
 });
 test('admin confirmations offer separate confirm and cancel actions', () => {
   const html = renderToStaticMarkup(createElement(Dialog, { item: { title: 'Confirm action', message: 'Suspend this account?', confirm: true }, onAnswer() {} }));
